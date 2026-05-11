@@ -485,9 +485,49 @@ ismapped(pagetable_t pagetable, uint64 va)
   return 0;
 }
 
+// Recursive function prototype
+static void
+vmprintwalk(pagetable_t pagetable, int level, int depth, uint64 va);
+
 void
 vmprint(pagetable_t pagetable)
 {
   printf("page table %p\n", pagetable);
-  printf("TODO: implemente vmprint() em kernel/vm.c\n");
+  // Recursive function to print valid tables:
+  vmprintwalk(pagetable, 2, 1, 0);
+}
+
+// Logically implemented recursive function
+static void
+vmprintwalk(pagetable_t pagetable, int level, int depth, uint64 va){
+  for(int i = 0; i < 512; i++){
+    // Reading the current PTE
+    pte_t pte = pagetable[i];
+
+    // Ignore the invalid PTE
+    if((pte & PTE_V) == 0)
+      continue;
+
+    // Rebuild VA (Virtual Address)
+    // 	- Level 2 => 30 shift left (L2)
+    // 	- Level 1 => 21 shift leff (L1)
+    // 	- Level 0 => 12 shift left (L0)
+    uint64 childva = va | ((uint64)i << PXSHIFT(level));
+
+    // Extract physical address
+    uint64 pa = PTE2PA(pte);
+
+    // Indentation print
+    for(int j = 0; j < depth; j++) {
+      printf(".. ");
+    }
+
+    // The line print
+    printf("%d: va 0x000000%lx pte 0x000000%lx pa 0x000000%lx\n", i, childva, pte, pa);
+
+    // Verification intermediate PTE (call the vmprintwalk funciton)
+    if(level > 0 && (pte & (PTE_R | PTE_W | PTE_X)) == 0){
+      vmprintwalk((pagetable_t)pa, level - 1, depth + 1, childva);
+    }
+  }
 }
